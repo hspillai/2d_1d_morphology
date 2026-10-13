@@ -4,22 +4,14 @@ import sys
 sys.path.append('../../catmap/')
 sys.path.append('./../../libs/')
 
-import os
-from dolfinx import fem, geometry
-from os import system as shell
-
-from functools import partial
-from catmap import ReactionModel
-from ase.units import _Nav
-from ase.build import fcc100
-
+import csv
 import numpy as np
 import pandas as pd
-import os
-import re
-import matplotlib.pyplot as plt
-from copy import deepcopy
+from functools import partial
+from dolfinx import fem, geometry
 from scipy.interpolate import CubicSpline
+
+from catmap import ReactionModel
 
 from SolverModule import ElectrolyteSolver
 from KineticsModule import KineticSolver
@@ -44,7 +36,7 @@ def get_oned_results(rho, L, U, diff_CO, K_henry, initial_range = np.array([0.98
     oned_solver.create_dirchlet()
 
     kineticSolver = KineticSolver(potential = U,
-                                  catmap_mkm_path = '/../../kinetic_data/rates.npy',
+                                  catmap_mkm_path = '../../kinetic_data/rates.npy',
                                   Dab = diff_CO,
                                   K_henry = K_henry)
 
@@ -86,37 +78,30 @@ U = -1.55
 K_henry = 8.972E-6 * 101325  # mol/m3 atm
 diff_CO = 20.3e-10
 
-# Load mesh metadata
-mesh_df = pd.read_csv('../../meshes/mesh.csv')  # Adjust path as needed
-run_meshes = mesh_df[
-    (np.isclose(mesh_df['L'], L)) &
-    (np.isclose(mesh_df['r'], r)) &    
-    (mesh_df['file_name'].str.contains("fine"))
-]
+with open('mesh_list.csv', newline='') as f:
+    reader = csv.reader(f)
+    meshes = list(reader)
 
-data_path = '../results/'  # or wherever you want to save
-os.makedirs(data_path, exist_ok=True)
+meshes = meshes[0]
+mesh_df = pd.read_csv('../../meshes/mesh.csv')  # Adjust path as needed
+run_meshes = mesh_df[mesh_df['file_name'].isin(meshes)]
+
+data_path = '../../results/'  # or wherever you want to save
 custom_data = CustomData(pandas_path=data_path)
 
-# if len(custom_data.df[custom_data.df.rho == rho]['Selectivity_1d'].values) == 0:
-#     final_conc_oned, sel_1d, return_array = get_oned_results(rho, L, U, diff_CO, K_henry)
-# else:
-#     final_conc_oned = 0.04
-#     sel_1d = custom_data.df[custom_data.df.rho == rho]['Selectivity_1d'].values[0]
-resolution = 'fine'
 i = 0
-
 for _, row in run_meshes.iterrows():    
 
     mesh_name = row.file_name    
-    mesh_path = '../meshes/' + mesh_name
+    mesh_path = '../../meshes/' + mesh_name
     rho = row['rho']
     L = row['L']
     print(mesh_name)
     if custom_data.entry_exists(mesh_name):# and mesh_name not in unconverged_meshes:
+        print('Exists!')
         continue
     
-    if i == 4:
+    if i == 1:
         break
 
     final_conc_oned, sel_1d, return_array = get_oned_results(row['rho'],
@@ -124,7 +109,7 @@ for _, row in run_meshes.iterrows():
                                                              U, diff_CO, K_henry)    
 
     kineticSolver = KineticSolver(potential = U,
-                                  catmap_mkm_path = '../../../../../kinetic_data/rates_v3.npy',
+                                  catmap_mkm_path = '../../kinetic_data/rates.npy',
                                   Dab = diff_CO,
                                   K_henry = K_henry)
     kineticSolver.load_data()
@@ -178,7 +163,7 @@ for _, row in run_meshes.iterrows():
             'Selectivity_1d': sel_1d, 
             'Flux/C' : flux,
             'converged': converged,
-            'resolution': resolution}
+            'resolution': 'fine'}
 
         print(selectivity, sel_1d)
         custom_data.add_entry(result)

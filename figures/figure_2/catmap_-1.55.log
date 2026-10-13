@@ -1,0 +1,175 @@
+from numpy import array
+
+try:
+    import cPickle as pickle
+
+except: #workaround for python3.X
+    import _pickle as pickle
+
+
+from mpmath import mpf 
+
+parser = None
+
+scaler = 'ThermodynamicScaler'
+
+thermodynamics = 'ThermoCorrections'
+
+solver = 'SteadyStateSolver'
+
+mapper = 'MinResidMapper'
+
+binary_data = pickle.load(open("test.pkl","rb"))
+
+locals().update(binary_data)
+
+A_uc = None
+
+adsorbate_interaction_model = 'ideal'
+
+adsorbate_interactions = None
+
+adsorbate_names = ('CO2_100', 'COH_100', 'COOH_100', 'CO_100')
+
+adsorbate_thermo_mode = 'frozen_adsorbate'
+
+analytical_jacobian = True
+
+atomic_reservoir_list = [{'H': 'CHOH_g', 'O': 'CO2_g', 'C': 'CO_g'}, {'H': 'CHOH_g', 'O': 'H2O_g', 'C': 'CO2_g'}, {'H': 'CHOH_g', 'O': 'H2O_g', 'C': 'CO_g'}, {'H': 'H2O_g', 'O': 'CO2_g', 'C': 'CO_g'}, {'H': 'H2_g', 'O': 'CHOH_g', 'C': 'CO2_g'}, {'H': 'H2_g', 'O': 'CO2_g', 'C': 'CO_g'}, {'H': 'H2_g', 'O': 'H2O_g', 'C': 'CHOH_g'}, {'H': 'H2_g', 'O': 'H2O_g', 'C': 'CO2_g'}, {'H': 'H2_g', 'O': 'H2O_g', 'C': 'CO_g'}, {'H': 'pe_g', 'O': 'CHOH_g', 'C': 'CO2_g'}, {'H': 'pe_g', 'O': 'CO2_g', 'C': 'CO_g'}, {'H': 'pe_g', 'O': 'H2O_g', 'C': 'CHOH_g'}, {'H': 'pe_g', 'O': 'H2O_g', 'C': 'CO2_g'}, {'H': 'pe_g', 'O': 'H2O_g', 'C': 'CO_g'}]
+
+atoms_dict = {}
+
+beta = 0.5
+
+coverage_headers = ['coverage', 'coadsorbate_coverage']
+
+data_file = 'test.pkl'
+
+decimal_precision = 300
+
+descriptor_decimal_precision = 2
+
+descriptor_names = ('voltage', 'temperature')
+
+descriptor_ranges = [[-1.55, -1.55], [300, 300]]
+
+echem_transition_state_names = []
+
+electrochemical_thermo_mode = 'simple_electrochemical'
+
+elementary_rxns = ([['CO2_g', '100'], ['CO2-_100'], ['CO2_100']], [['CO2_100', 'pe_g'], ['CO2-pe_100'], ['COOH_100']], [['COOH_100', 'pe_g'], ['COOH-pe_100'], ['CO_100', 'H2O_g']], [['CO_100'], ['CO-_100'], ['CO_g', '100']], [['CO_100', 'pe_g'], ['CO-pe_100'], ['COH_100']], [['COH_100', 'pe_g'], ['COH-pe_100'], ['CHOH_g', '100']], [['H2_g'], ['H2_g']])
+
+estimate_frequencies = True
+
+extrapolate_coverages = False
+
+extrapolated_potential = 0
+
+fixed_entropy_dict = {'H2_g': 0.00135, 'other': 0.002}
+
+force_recalculation = True
+
+force_recompilation = False
+
+frequency_dict = {'CO2_g': [0.0], 'CO_g': [0.0], 'H2O_g': [0.0], 'H2_g': [0.0], 'pe_g': [0.0], 'CHOH_g': [0.0], '100': [], 'CO2_100': [0.0], 'COH_100': [0.0], 'COOH_100': [0.0], 'CO_100': [0.0], 'CO-_100': [0.0], 'CO-pe_100': [0.0], 'CO2-_100': [0.0], 'CO2-pe_100': [0.0], 'COH-pe_100': [0.0], 'COOH-pe_100': [0.0], 'g': [], '*_g': [], '*_100': []}
+
+frequency_surface_names = []
+
+frequency_unit_conversion = 0.0001239842
+
+gas_names = ('CHOH_g', 'CO2_g', 'CO_g', 'H2O_g', 'H2_g', 'pe_g')
+
+gas_pressures = [1.0, 1.0, 0.041683469425524804, 1.0, 1.0, 1.0]
+
+gas_thermo_mode = 'frozen_gas'
+
+hbond_dict = {'COOH': -0.25, 'OCHO': 0.0, 'CO': -0.1, 'CHO': -0.1, 'CH2O': 0.0, 'OCH3': 0.0, 'O': 0.0, 'OH': -0.5, 'H': 0.0, 'COH': -0.25, 'C': 0.0, 'CH': 0.0, 'CH2': 0.0, 'CH3': 0.0, 'CHOH': -0.25, 'COHOH': -0.25, 'OCH2O': 0.0, 'CH2OH': -0.25, 'OCHCH2': 0.0, 'OCHCHO': 0.0}
+
+hindered_ads_params = {}
+
+ideal_gas_params = {'H2_g': [2, 'linear', 0], 'N2_g': [2, 'linear', 0], 'O2_g': [2, 'linear', 1.0], 'H2O_g': [2, 'nonlinear', 0], 'CO_g': [1, 'linear', 0], 'CH4_g': [12, 'nonlinear', 0], 'NH3_g': [3, 'nonlinear', 0], 'CH3OH_g': [1, 'nonlinear', 0], 'CH3CH2OH_g': [1, 'nonlinear', 0], 'CO2_g': [2, 'linear', 0], 'CH2O_g': [2, 'nonlinear', 0], 'HCOOH_g': [1, 'nonlinear', 0], 'CH2CH2_g': [4, 'nonlinear', 0], 'CH3CHCH2_g': [1, 'nonlinear', 0], 'CH3CH2CHCH2_g': [1, 'nonlinear', 0], 'CH3CHCHCH3_g': [2, 'nonlinear', 0], 'CH3CH3CCH2_g': [2, 'nonlinear', 0], 'pe_g': [2, 'linear', 0], 'C2H2_g': [2, 'linear', 0], 'C2H4_g': [4, 'nonlinear', 0], 'C2H6_g': [6, 'nonlinear', 0], 'C3H6_g': [1, 'nonlinear', 0], 'CH3COOH_g': [1, 'nonlinear', 0], 'CH3CHO_g': [1, 'nonlinear', 0], 'C5H4O2_g': [1, 'nonlinear', 0], 'C5H6O2_g': [1, 'nonlinear', 0], 'C5H6O_g': [1, 'nonlinear', 0], 'HCl_g': [1, 'linear', 0], 'Cl2_g': [2, 'linear', 0]}
+
+input_file = '../../kinetic_data/formation_energies.txt'
+
+interaction_fitting_mode = None
+
+interaction_surface_names = None
+
+internally_constrain_coverages = True
+
+kBT = mpf('0.02585199743400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005')
+
+max_bisections = 5
+
+max_initial_guesses = 3
+
+max_log_line_length = 0
+
+max_rootfinding_iterations = 200
+
+model_name = 'catmap_-1.55'
+
+numerical_representation = 'mpmath'
+
+optimize_analytical_expressions = False
+
+output_labels = {'coverage': ('CO2_100', 'COH_100', 'COOH_100', 'CO_100'), 'rate': ([['CO2_g', '100'], ['CO2-_100'], ['CO2_100']], [['CO2_100', 'pe_g'], ['CO2-pe_100'], ['COOH_100']], [['COOH_100', 'pe_g'], ['COOH-pe_100'], ['CO_100', 'H2O_g']], [['CO_100'], ['CO-_100'], ['CO_g', '100']], [['CO_100', 'pe_g'], ['CO-pe_100'], ['COH_100']], [['COH_100', 'pe_g'], ['COH-pe_100'], ['CHOH_g', '100']], [['H2_g'], ['H2_g']]), 'production_rate': ('CHOH_g', 'CO2_g', 'CO_g', 'H2O_g', 'H2_g', 'pe_g')}
+
+output_variables = ['coverage', 'rate', 'rate', 'production_rate']
+
+parameter_mode = 'formation_energy'
+
+parameter_names = ('CO2_100', 'COH_100', 'COOH_100', 'CO_100', 'CO-_100', 'CO-pe_100', 'CO2-_100', 'CO2-pe_100', 'COH-pe_100', 'COOH-pe_100')
+
+parse_headers = ['formation_energy', 'frequencies']
+
+perturbation_size = 1e-14
+
+prefactor_list = ['6250990000000.0', '6250990000000.0', '6250990000000.0', '6250990000000.0', '6250990000000.0', '6250990000000.0', '6250990000000.0']
+
+pressure = 1.0
+
+pressure_mode = 'static'
+
+required_headers = ['species_name', 'surface_name', 'site_name', 'formation_energy', 'frequencies', 'reference']
+
+residual_threshold = 0.9
+
+resolution = [1, 1]
+
+rxn_expressions = ['CO2_g + *_100 <-> CO2-_100 <-> CO2_100', 'CO2_100 + pe_g <-> CO2-pe_100 <-> COOH_100', 'COOH_100 + pe_g <-> COOH-pe_100 <-> CO_100 + H2O_g', 'CO_100 <-> CO-_100 <-> CO_g + *_100', 'CO_100 + pe_g <-> CO-pe_100 <-> COH_100', 'COH_100 + pe_g <-> COH-pe_100 <-> CHOH_g + *_100', 'H2_g <-> H2_g']
+
+rxn_mechanisms = {'test': [1, 2, 3, 4, 5, 6]}
+
+rxn_options_dict = {'prefactor': {}, 'beta': {}}
+
+search_directions = [[0, 0], [0, 1], [1, 0], [0, -1], [-1, 0], [-1, 1], [1, 1], [1, -1], [-1, -1]]
+
+setup_file = 'catmap_-1.55.mkm'
+
+site_names = ('g', '100')
+
+standard_coadsorbate_coverage = 'min'
+
+standard_coverage = 'min'
+
+surface_names = ('Cu',)
+
+temperature = 300.0
+
+thermodynamic_corrections = ['gas', 'adsorbate', 'electrochemical']
+
+thermodynamic_variables = ['temperature', 'gas_pressures', 'voltage', 'beta', 'pH', 'Upzc', 'gas_thermo_mode', 'adsorbate_thermo_mode']
+
+tolerance = 1e-300
+
+transition_state_names = ('CO-_100', 'CO-pe_100', 'CO2-_100', 'CO2-pe_100', 'COH-pe_100', 'COOH-pe_100')
+
+verbose = 1
+
+voltage = -1.55
+
+voltage_diff_drop = 0.0
+
+stdout = """initial_evaluation: success - initial guess at point [-1.55,300.00]
+mapper_iteration_0: status - 0 points do not have valid solution."""

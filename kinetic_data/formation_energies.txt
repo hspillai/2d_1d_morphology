@@ -1,0 +1,19 @@
+surface_name	site_name	species_name	formation_energy	frequencies	reference
+Cu	100	CO	-0.2943758185835382	[0]	toy model
+Cu	100	CO-	-0.1293758185835382	[0]	toy model
+Cu	100	CO-pe	1.2056241814164617	[0]	toy model
+Cu	100	CO2	0.0270113274956913	[0]	toy model
+Cu	100	CO2-	0.0270113274956913	[0]	toy model
+Cu	100	CO2-pe	1.4770113274956913	[0]	toy model
+Cu	100	COH	-0.843598535491369	[0]	toy model
+Cu	100	COH-	-0.843598535491369	[0]	toy model
+Cu	100	COH-pe	-0.843598535491369	[0]	toy model
+Cu	100	COOH	0.0188971704381867	[0]	toy model
+Cu	100	COOH-pe	1.2663610787821735	[0]	toy model
+None	gas	CO	-0.194375819	[0]	toy model
+None	gas	CO2	0.0	[0]	toy model
+None	gas	COH	-1.284283707	[0]	toy model
+None	gas	CHOH	-1.284283707	[0]	toy model
+None	gas	H2	0.0	[0]	toy model
+None	gas	H2O	0.0	[0]	toy model
+None	gas	pe	0.0	[0]	toy model
