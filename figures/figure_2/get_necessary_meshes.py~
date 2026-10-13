@@ -1,0 +1,51 @@
+from mpi4py import MPI
+
+import sys
+sys.path.append('../../catmap/')
+sys.path.append('./../../libs/')
+
+import os
+from dolfinx import fem, geometry
+from os import system as shell
+
+from functools import partial
+from catmap import ReactionModel
+from ase.units import _Nav
+from ase.build import fcc100
+
+import numpy as np
+import pandas as pd
+import os
+import re
+import matplotlib.pyplot as plt
+from copy import deepcopy
+from scipy.interpolate import CubicSpline
+
+from SolverModule import ElectrolyteSolver
+from KineticsModule import KineticSolver
+from ConvergenceModule import (screen_initial_guess,
+                               calc_error_l2,
+                               converge_concentration,
+                               run_full_convergence)
+from ReadData import CustomData
+
+
+
+# get the mesh data for L_diff = 25 and 5 micrometer
+# and particle sizes for 0.75, 1.5 and 2.5 micrometer  
+L = 25 * 1e-6#25e-6
+r = 2.5 * 1e-6
+
+# Load mesh metadata
+mesh_df = pd.read_csv('../../meshes/mesh.csv')  # Adjust path as needed
+run_meshes = mesh_df[((np.isclose(mesh_df['L'], 25 * 1e-6)) | (np.isclose(mesh_df['L'], 5 * 1e-6))) &
+                     ((np.isclose(mesh_df['r'], 2.5 * 1e-6)) | (np.isclose(mesh_df['r'], 1.5 * 1e-6))  | (np.isclose(mesh_df['r'], 0.75 * 1e-6)))]
+
+
+mesh_files = run_meshes['file_name'].values
+
+# run_meshes = mesh_df[
+#     (np.isclose(mesh_df['L'], L)) &
+#     (np.isclose(mesh_df['r'], r)) &    
+#     (mesh_df['file_name'].str.contains("fine"))
+# ]

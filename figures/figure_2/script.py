@@ -1,7 +1,7 @@
 from mpi4py import MPI
 
 import sys
-sys.path.append('/home/hspillai/catmap_fhi/catmap-ec/')
+sys.path.append('../../catmap/')
 sys.path.append('./../../libs/')
 
 import os
@@ -44,7 +44,7 @@ def get_oned_results(rho, L, U, diff_CO, K_henry, initial_range = np.array([0.98
     oned_solver.create_dirchlet()
 
     kineticSolver = KineticSolver(potential = U,
-                                  catmap_mkm_path = '../../../../../kinetic_data/rates_v3.npy',
+                                  catmap_mkm_path = '/../../kinetic_data/rates.npy',
                                   Dab = diff_CO,
                                   K_henry = K_henry)
 
@@ -52,14 +52,13 @@ def get_oned_results(rho, L, U, diff_CO, K_henry, initial_range = np.array([0.98
     mkm_roughness_intermediate = lambda c: kineticSolver.run_mkm_roughness_intermediate(c, rho = rho)
     mkm_roughness_product = lambda c: kineticSolver.run_mkm_roughness_product(c, rho = rho)
 
-    initial_c, final_error = screen_initial_guess(
-        solver=oned_solver,
-        kinetic_mapper=mkm_roughness,     
-        initial_conc_range=initial_range,
-        error_fn=calc_error_l2,
-        tol=1e-7,
-        max_iter=10,
-        verbose=True)
+    initial_c, final_error = screen_initial_guess(solver=oned_solver,
+                                                  kinetic_mapper=mkm_roughness,     
+                                                  initial_conc_range=initial_range,
+                                                  error_fn=calc_error_l2,
+                                                  tol=1e-7,
+                                                  max_iter=10,
+                                                  verbose=True)
 
     final_conc, return_array = converge_concentration(solver = oned_solver,
                                                       kinetics_mapper=mkm_roughness,
@@ -88,7 +87,7 @@ K_henry = 8.972E-6 * 101325  # mol/m3 atm
 diff_CO = 20.3e-10
 
 # Load mesh metadata
-mesh_df = pd.read_csv('../meshes/mesh.csv')  # Adjust path as needed
+mesh_df = pd.read_csv('../../meshes/mesh.csv')  # Adjust path as needed
 run_meshes = mesh_df[
     (np.isclose(mesh_df['L'], L)) &
     (np.isclose(mesh_df['r'], r)) &    
@@ -107,7 +106,6 @@ custom_data = CustomData(pandas_path=data_path)
 resolution = 'fine'
 i = 0
 
-#run_meshes = run_meshes[-11:]
 for _, row in run_meshes.iterrows():    
 
     mesh_name = row.file_name    
@@ -169,7 +167,6 @@ for _, row in run_meshes.iterrows():
                                                    get_flux = True,
                                                    kinetic_mapper_bc = kineticSolver.spline_bc)
         
-#        mesh_row = mesh_meta[mesh_meta['file_name'] == mesh_name]
         result = {
             'mesh': mesh_name,
             'rho': rho,
