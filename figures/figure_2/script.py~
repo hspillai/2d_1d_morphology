@@ -1,0 +1,30 @@
+from mpi4py import MPI
+
+import sys
+sys.path.append('/home/hspillai/catmap_fhi/catmap-ec/')
+sys.path.append('/home/hspillai/morphology_2d_1d/libs/')
+
+import os
+from dolfinx import fem, geometry
+from os import system as shell
+
+from functools import partial
+from catmap import ReactionModel
+from ase.units import _Nav
+from ase.build import fcc100
+
+import numpy as np
+import pandas as pd
+import os
+import re
+import matplotlib.pyplot as plt
+from copy import deepcopy
+from scipy.interpolate import CubicSpline
+
+from SolverModule import ElectrolyteSolver
+from KineticsModule import KineticSolver
+from ConvergenceModule import (screen_initial_guess,
+                               calc_error_l2,
+                               converge_concentration,
+                               run_full_convergence)
+from ReadData import CustomData
