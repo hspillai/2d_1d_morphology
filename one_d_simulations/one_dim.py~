@@ -1,0 +1,300 @@
+# from helper import *
+import sys
+sys.path.append('../catmap/')
+sys.path.append('../libs/')
+
+import os
+from os import system as shell
+
+from catmap import ReactionModel
+from ase.units import _Nav
+from ase.build import fcc100
+
+import ufl
+import numpy as np
+from dolfinx import fem, default_scalar_type, mesh
+from dolfinx.io import gmshio
+
+import matplotlib.pyplot as plt
+from petsc4py.PETSc import ScalarType
+from mpi4py import MPI
+import pickle
+
+from KineticsModule import KineticSolver
+from ReadData import CustomData
+
+def load_spline(file_name = 'spline.pkl'):
+    with open(file_name, 'rb') as file_handle:
+        spline = pickle.load(file_handle)
+    return spline
+
+def modify(U, a):
+    mkm_file_name = 'catmap_{}.mkm'.format(U)
+    shell("sed -e 's/UVAL/{}/g' -e 's/ACTIVITY/{}/g' catmap_template.mkm > {}".format(U, a, mkm_file_name))
+
+    return mkm_file_name
+
+def rateToJ(rate):
+    
+    atoms = fcc100('Cu', a = 3.6149, size = (1, 1, 5), vacuum = 10.0, orthogonal = True)
+    site_density = atoms.get_volume()/atoms.cell[2,2] # A^2
+    site_density *= (1e-10)**2 # m^2/site
+
+    # convert rate to flux
+    J = rate * (1/_Nav) * (1/site_density)  # mole/(m^2 s) do i need to weight this for node values?
+    
+    return J
+
+def DeleteFiles(U):
+    mkm_file_name = 'catmap_{}.mkm'.format(U)
+    log_file_name = 'catmap_{}.log'.format(U)
+    pkl_file_name = 'test.pkl'
+
+    shell('rm {}'.format(mkm_file_name))
+    shell('rm {}'.format(log_file_name))
+    shell('rm {}'.format(pkl_file_name))
+
+def run_mkm(U: float, cs: list):
+    k_henry = 8.972E-6 * 101325  # mol/m3 atm
+    intermediate_fluxs = []
+    product_fluxs = []
+    for c in cs:
+        a = c/k_henry
+        mkm_file_name = modify(U, a)
+    
+        model = ReactionModel(setup_file = mkm_file_name, max_log_line_length = 0)
+        model.output_variables+=['rate', 'production_rate', 'free_energy', 'selectivity']
+        model.run()
+
+        d1, rates = model.rate_map[0]
+        u, T = d1
+        desorption_flux = max(rateToJ(rates[3]), 0)
+        product_flux = rateToJ(rates[5])
+        intermediate_fluxs.append(desorption_flux)
+        product_fluxs.append(product_flux)
+    return np.array(intermediate_fluxs), np.array(product_fluxs)
+
+class ElectrolyteSolver:
+    def __init__(self, active_inxs: list, inactive_inxs: list,
+                 dirichlet_inxs: list, dirichlet_bcs: list,
+                 ft,
+                 model=None):
+        self.Cb = Cb
+        self.model = model
+
+        self.active_inxs = active_inxs
+        self.inactive_inxs = inactive_inxs
+        self.dirichlet_inxs = dirichlet_inxs
+        self.dirichlet_bcs = dirichlet_bcs
+
+        self.bcs = []
+        self.mesh = model
+        self.ft = ft
+        self.dim = self.mesh.topology.dim
+        
+        self.V = fem.FunctionSpace(domain, ("Lagrange", 1))
+        self.c = ufl.TrialFunction(self.V)
+        self.v = ufl.TestFunction(self.V)
+        self.ds = ufl.Measure('ds', domain=self.mesh,
+                              subdomain_data=self.ft)
+        self.map_ft_dofs()
+
+    def map_ft_dofs(self, plot=False):
+        self.dofs_dict = {}
+        if plot is True:
+            fig, ax = plt.subplots()
+        self.cords = self.mesh.geometry.x
+        inxs = self.active_inxs + self.inactive_inxs + self.dirichlet_inxs
+        for i in inxs:
+            if i is None:
+                continue
+            dofs = self.cords[fem.locate_dofs_topological(self.V,
+                                                          self.dim - 1, self.ft.find(i))]
+            dofs_ind = fem.locate_dofs_topological(self.V,
+                                                   self.dim - 1, self.ft.find(i))
+            self.dofs_dict[i] = [dofs, dofs_ind]
+            if plot is True:
+                ax.scatter(dofs[:, 0], dofs[:, 1], label=i)
+        if plot is True:
+            ax.legend()
+            fig.savefig('dofs.pdf')
+        
+    def update_L(self, g_inactive, g_active):
+        '''
+        update the right side of Ax=B with the new flux
+        '''
+        self.L = 0
+        for i in self.inactive_inxs:
+            if i is None:
+                continue
+            self.L -= ufl.inner(g_inactive, self.v) * self.ds(i)
+
+        for i in self.active_inxs:
+            self.L -= ufl.inner(g_active, self.v) * self.ds(i)
+        return self.L
+         
+    def create_dirchlet(self):
+        '''
+        create the dirchlet boundary conditions for a given index with values
+        provided by dirchletBcs
+
+        Parameters
+        ----------
+            inxs: list or int
+                The indexes for which we want to put a dirchlet Boundary
+                condition
+
+            DirchletBcs: list or int
+                The Dirchlet boundary condition values that will be set to the
+                dofs given by inxs
+        '''
+
+        for count, i in enumerate(self.dirichlet_bcs):
+            self.bcs.append(fem.dirichletbc(value=ScalarType(i),
+                                            dofs=self.dofs_dict[self.dirichlet_inxs[count]][1],
+                                            V=self.V))
+        
+    def solve(self, g_active):
+        '''
+        create weak form and solve the problem neumann_inxs is where the
+        integration bounds come from this is an attempt to consider
+        inactive and active sites this is for the case where the active strip
+        is in the middle
+        Parameters
+        ------------
+        inactive_tags: list of tags which connect to the inactive areas.
+        active_tags: list of tags which connect to the active areas.
+        '''
+        a = ufl.inner(ufl.grad(self.v), ufl.grad(self.c)) * ufl.dx
+        g_zero = fem.Constant(self.mesh, default_scalar_type(0.0))
+        self.update_L(g_zero, g_active)
+        problem = fem.petsc.LinearProblem(a, self.L,
+                                          bcs=self.bcs,
+                                          petsc_options={"ksp_type": "preonly",
+                                                         "pc_type": "lu"})
+        self.concs = problem.solve()
+        self.concs.name = 'concentration'
+
+    def get_surface_conc(self):
+        for i in self.active_inxs:
+            self.surface_concs = self.concs.x.array[self.dofs_dict[i][1]]
+            self.surface_cords = self.cords[self.dofs_dict[i][1]]
+
+def converge_conc(rho: float, solver, kinetic_mapper,
+                  Cb = 0,  nit = 500, mixing_factor = 0.02):
+    g = fem.Function(solver.V)
+    c_i = 0.01
+    
+    for i in range(0, nit):
+        if i == 0:
+            # this can be a function to make the InitialGuess
+            conc_init = np.full_like(g.x.array, c_i)
+            surface_dofs = solver.dofs_dict[1][1]
+#            g.x.array[surface_dofs] =  -1 * (1/diff_CO) * rho * run_mkm(-1.55, conc_init[surface_dofs])[0]
+            g.x.array[surface_dofs] =  -1 * rho * kinetic_mapper(conc_init[surface_dofs])
+            solver.solve(g)
+            solver.get_surface_conc()
+
+        # this can be a function i.e. make next conc_next_it def mix(c_i_1, c_i)
+        conc_next_it = mixing_factor * solver.surface_concs + (1-mixing_factor) * conc_init[surface_dofs]
+
+        #g.x.array[surface_dofs] =  -1 * (1/diff_CO) * rho * run_mkm(-1.55, conc_next_it[surface_dofs])[0]
+        g.x.array[surface_dofs] =  -1 * rho * kinetic_mapper(conc_next_it[surface_dofs])
+        
+        solver.solve(g)
+        solver.get_surface_conc()
+        
+        conc_init = conc_next_it
+        error = abs(solver.surface_concs - conc_next_it)/solver.surface_concs
+
+        print(solver.concs.x.array[surface_dofs], error)    
+        if error < 1E-3:
+            c_opt = solver.surface_concs
+            break
+
+        if i > 500:
+            print('Running for 200 iterations.!')
+            c_opt = False
+            break
+
+    return c_opt
+
+def get_selectivity(conc:list):
+    intermediate, product = run_mkm(-1.55, conc)
+    return (intermediate/(intermediate + product)) * 100
+
+def kinetic_mapper(concs:list):
+    diff_co = 20.3E-10
+    return (1/diff_CO) * run_mkm(-1.55, concs)[0]
+
+# we have to feed in the domain and the facettypes for the 1D model
+n_cells = 100
+x_max = 5e-6 # diffusion length
+domain = mesh.create_interval(MPI.COMM_WORLD, n_cells, [0, x_max])
+fdim = domain.topology.dim - 1
+
+Cb = 0
+diff_CO = 20.3E-10
+
+facet_indices, facet_markers = [], []
+
+boundaries = [(1, lambda x: np.isclose(x[0], 0)),
+              (2, lambda x: np.isclose(x[0], x_max))]
+
+for (marker, locator) in boundaries:
+    facets = mesh.locate_entities(domain, fdim, locator)
+    facet_indices.append(facets)
+    facet_markers.append(np.full_like(facets, marker))
+
+facet_tag = mesh.meshtags(domain, fdim, facet_indices, facet_markers)
+solver = ElectrolyteSolver([1], [None], [2],
+                           [Cb], facet_tag, domain)
+
+solver.create_dirchlet()
+
+catmap_path = '../kinetic_data/rates.npy'
+U = -1.55
+K_henry = 8.972E-6 * 101325  # mol/m3 atm
+diff_CO = 20.3e-10
+
+kineticSolver = KineticSolver(potential = U,
+                              catmap_mkm_path = catmap_path,
+                              Dab = diff_CO,
+                              K_henry = K_henry)
+kineticSolver.load_data()
+kineticSolver.fit_splines()
+new_entries = []
+
+data_path = './results/'  # or wherever you want to save
+os.makedirs(data_path, exist_ok=True)
+custom_data = CustomData(pandas_path=data_path, columns = ['rho', 'U',
+                                                           'L', 'sel'])
+
+# #custom_data.df[custom_data.df['L'] == 50e-6]
+# rhos = [0.001, 0.002, 0.003]
+# #        1.40, 1.5]
+# sels_catmap = []
+# sels_spline = []
+# for r in rhos:
+#     c_opt_catmap = converge_conc(r, solver, kinetic_mapper)
+# #    c_opt_spline = converge_conc(r, solver, kineticSolver.cs_boundary_condition)
+
+#     sel_catmap = get_selectivity(c_opt_catmap)
+#     sels_catmap.append(sel_catmap)
+#     result = {
+#         'mesh': str(r),
+#         'rho': r,
+#         'U': U,
+#         'L': x_max,
+#         'sel': sel_catmap[0]}
+#     custom_data.add_entry(result, ignore_check = True)
+#     custom_data.save_all()
+    
+#    sel_spline = 100 * (kineticSolver.cs_intermediate_flux(c_opt_spline)/(kineticSolver.cs_intermediate_flux(c_opt_spline) + kineticSolver.cs_product_flux(c_opt_spline)))
+#    sels_spline.append(sel_spline)
+    
+# fig, ax = plt.subplots()
+# ax.scatter(rhos, sels_catmap, marker = 'o', label = 'catmap')
+# ax.scatter(rhos, sels_spline, marker = 'x', label = 'spline')
+# ax.legend()
+# fig.savefig('1d_model.pdf')

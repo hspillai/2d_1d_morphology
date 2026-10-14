@@ -1,0 +1,234 @@
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from matplotlib.lines import Line2D
+import pickle
+import pandas as pd
+import numpy as np
+import os
+import sys
+
+project_root = os.path.abspath(os.path.dirname('Plot.py'))
+libs_path = os.path.join(project_root, '../libs/')
+libs_path_2 = os.path.join(project_root, '../../../libs/')
+sys.path.append(libs_path)
+sys.path.append(libs_path_2)
+
+#from DefaultPlot import set_defaults_2, paper_path,  
+from paper_defaults import set_paper_params, set_panel_labels_2, PlotContour_fromDict, paper_path
+from ReadData import CustomData
+
+set_paper_params(font_size = 10,
+                 label_pad = 1.5)
+
+def rho_prime(r, length):
+    return (2 * r**2)/(r**2+2*r*length+length**2)
+
+oned_path = '../../../one_d_simulations/results/'
+hemi_path = '../../../cylinderical/hemisphere/realL/SelvsRho/results/'
+
+selected_data = pickle.load(open(hemi_path + 'selected_data.pkl', 'rb'))
+
+one_d = CustomData(pandas_path=oned_path).sort_by('rho')
+hemi = CustomData(pandas_path=hemi_path).scale_column('sel', 100).sort_by('rho').add_ratio_column('r/L', 'r', 'L').difference_columns('sel_diff', 'sel', 'selectivity_1d')
+
+df = hemi.filter_data(L = 25e-6, rho = 0.1, resolution = 'fine')
+df = df.sort_values('r')
+df_oned = one_d.filter_data(L=25e-6, rho = 0.1)
+
+
+fig, axd = plt.subplot_mosaic([['top', 'top', 'top'],
+                               ['left', 'middle left', 'right']],
+
+                              gridspec_kw = {'height_ratios': [1.2, 0.8]}) # 1.2 0.8
+
+fig.set_size_inches(1.7 * 3.75,
+                    3.85) # width, height
+axd['top'].scatter(df['r'] * 1e6,
+                   df['sel'],
+                   s = 40,
+                   facecolor = 'blue',
+                   edgecolor = 'black',
+                   marker = 'o')
+
+axd['top'].plot(df['r'] * 1e6,
+                df['sel'],
+                color = 'blue', lw = 0.90)
+
+axd['top'].axhline(float(df_oned['sel'].values[0]),
+                   color = 'k', lw = 1.1)
+
+axd['top'].xaxis.set_major_locator(ticker.MultipleLocator(2.0))
+axd['top'].xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
+axd['top'].yaxis.set_major_locator(ticker.MultipleLocator(5))
+axd['top'].yaxis.set_minor_locator(ticker.MultipleLocator(1))
+axd['top'].set_ylabel(r'$\rm Selectivity\ CO/C_{1}+C_{2+} (\%)$',
+                      y = 0.40)#, labelpad = 10)
+
+axd['top'].set_xlabel(r'Particle radius, $r_{\rm p}$ (\textmu m)',
+                      labelpad = 2) # -5.5
+
+
+axd['top'].set_xlim(-0.10, 8.0)
+axd['top'].set_ylim(15, 35)
+
+axd['top'].text(5.0, 32, r'1D\ Diffusion, $\rho = 0.1, L_{\rm diff} = 25 \textmu$')
+axd['top'].text(2.25, 25.0, r'$\rm 3D\ Diffusion, \rho = 0.1$', color = 'blue')
+
+inxs_to_plot = [0, 5, -1] # [0, 5, 9, -1]
+# Plotting the heatmaps 
+i = 0
+for k in axd.items():
+    
+    if k[0] == 'top':
+        continue
+    print(i, k[1])
+    if k[0] == 'right':    
+        a, contour = PlotContour_fromDict(k[1],
+                                          selected_data['inxs'][inxs_to_plot[i]],
+                                          selected_data)
+    else:
+        PlotContour_fromDict(k[1],
+                             selected_data['inxs'][inxs_to_plot[i]],
+                             selected_data)
+
+    # t1, w,t2,a, t3, l = files[i].split('_')
+    # w = float(w)
+    # a = float(a)
+    # l = float(l)
+    # title = (w-a)/l
+    R, r, L = selected_data[selected_data['inxs'][inxs_to_plot[i]]]['params']
+    title = round(r * 1e6, 1)
+
+    k[1].annotate(rf'$r_{{\rm p}}$ = {title} \textmu m',#.format(s = title),
+                      #r'$r  = \ ' + r' {f}'.format(f = title) + r' \textmu m$',
+                  (0.05, 0.77),
+                  xycoords = k[1],
+                  bbox=dict(facecolor='white', edgecolor='black',
+                            boxstyle='round'))
+    
+    # k[1].annotate(r'$\rm r / L_{diff} = \ $' + r'$\rm {f}$'.format(f = title),
+    #               (0.05, 0.75),
+    #               xycoords = k[1],
+    #               bbox=dict(facecolor='white', edgecolor='black',
+    #                         boxstyle='round'))
+    # k[1].plot([0, r],
+    #           [0, 0],
+    #           lw = 5.0,
+    #           color = 'red')
+    
+    i += 1
+
+# fig.colorbar(contour, ax = [axd['left'], axd['middle left'],
+#                             axd['middle right'], axd['right']],
+#              orientation = 'horizontal' ,
+#              extend = True,
+#              ticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0],
+#              label = r'$\rm Normalized\ CO\ Concentration$')# / Maximum\ Concentration$',)
+    
+axd['left'].set_ylabel(r'$z$ \ (\textmu m)')
+axd['left'].set_xlabel(r'$x$ \ (\textmu m)', labelpad = .1)
+axd['left'].xaxis.set_major_locator(ticker.MultipleLocator(0.25))
+
+axd['left'].set_ylim(0, 30)
+axd['left'].yaxis.set_major_locator(ticker.MultipleLocator(10))
+axd['left'].yaxis.set_minor_locator(ticker.MultipleLocator(5))
+
+axd['middle left'].set_xlabel(r'$x$ \ (\textmu m)', labelpad = .1)
+axd['middle left'].set_ylim(0, 30)
+
+axd['right'].set_xlabel(r'$x$ \ (\textmu m)', labelpad = .1)
+
+axd['middle left'].xaxis.set_major_locator(ticker.MultipleLocator(4))
+axd['middle left'].xaxis.set_minor_locator(ticker.MultipleLocator(1))
+axd['middle left'].yaxis.set_major_locator(ticker.MultipleLocator(10))
+axd['middle left'].yaxis.set_minor_locator(ticker.MultipleLocator(5))
+axd['middle left'].set_yticklabels([])
+
+axd['right'].xaxis.set_major_locator(ticker.MultipleLocator(15.0))
+axd['right'].xaxis.set_minor_locator(ticker.MultipleLocator(5.0))
+axd['right'].yaxis.set_major_locator(ticker.MultipleLocator(10))
+axd['right'].yaxis.set_minor_locator(ticker.MultipleLocator(5))
+axd['right'].set_ylim(0, 30)
+axd['right'].set_yticklabels([])
+
+fig.tight_layout()
+#fig.subplots_adjust(bottom=0.23)  # ensures room # 0.17
+
+# === Automatic colorbar spanning the 4 bottom panels ===
+# Collect bounding boxes of the 4 small axes
+
+# Pick the middle axis
+middle_ax = axd['middle left']
+bbox = middle_ax.get_position()
+
+# Define new axis for the colorbar just below middle plot
+cbar_height = 0.03
+cbar_pad = 0.12
+#cbar_ax = fig.add_axes([bbox.x0 - .05, bbox.y0 - cbar_pad, bbox.width + 0.10, cbar_height])
+
+axd['left'].set_xlim(-0.5, 0.5)
+axd['middle left'].set_xlim(-8, 8)
+
+# bbox_list = [axd['left'].get_position(),
+#              axd['middle left'].get_position(),
+# #             axd['middle right'].get_position(),
+#              axd['right'].get_position()]
+
+# Find the min/max horizontal extents
+#min_left = min(b.x0 for b in bbox_list)
+#max_right = max(b.x1 for b in bbox_list)
+
+# Define a new axis for the colorbar just below them
+#cbar_height = 0.03  # thickness of colorbar
+#cbar_pad = 0.12     # gap between subplots and colorbar
+#bottom = min(b.y0 for b in bbox_list) - cbar_pad
+
+#cbar_ax = fig.add_axes([min_left, bottom, max_right - min_left, cbar_height])
+#cbar_ax = fig.add_axes([min_left, bottom, max_right - min_left, cbar_height])
+
+#Create the colorbar in this dedicated axis
+# cbar = fig.colorbar(contour, cax=cbar_ax,
+#                     orientation='horizontal',
+#                     extend=True,
+#                     ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0])
+
+cbar = fig.colorbar(contour, ax=axd['right'],
+                    orientation='vertical',
+                    extend=True,
+                    ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0])
+
+# cbar = fig.colorbar(contour, ax=axd['middle left'],
+#                     orientation='horizontal',
+#                     extend=True,
+#                     ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0])
+
+panel_labels = ['a)', 'b)', 'c)', 'd)']
+set_panel_labels_2(
+    panel_labels,
+    [axd['top'], axd['left'], axd['middle left'], axd['right']],
+    left_align_ax=axd['left'],    # align top label with left subplot
+    offset_x=-0.05,               # small left shift (tweak if needed)
+    offset_y=0.00,
+    fontsize=10
+)
+# panel_labels = ['a)','b)', 'c)', 'd)']
+# set_panel_labels_2(
+#     panel_labels,
+#     [axd['top'], axd['left'], axd['middle left'], axd['right']],
+#     left_align_ax=axd['left']   # align top label with left subplot
+# )
+
+# set_panel_labels_2(panel_labels,
+#                    [axd['top'], axd['left'],
+#                     axd['middle left'], axd['right']],
+#                    left_align_ax = axd['left'])
+
+
+#cbar.ax.xaxis.set_label_position('top')
+cbar.set_label(r'$\rm Normalized\ CO\ Concentration$')
+
+fig.show()
+fig.savefig(paper_path + 'fig3.pdf', dpi = 300, transparent = True)
+fig.savefig(paper_path + 'fig3.svg', dpi = 300, transparent = True)
+
+#fig.show()
