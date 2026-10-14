@@ -1,0 +1,1 @@
+This repo contains scripts to generate the data and figures from the paper "The effect of electrocatalyst roughness and morphology on selectivity due to mass transport". The scripts should run using dolfinx version 0.10.0.post2. 
